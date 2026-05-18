@@ -12,7 +12,9 @@ import {
   CategoryScale,
 } from "chart.js";
 
-import { Line } from "react-chartjs-2";
+import InputPanel from "./components/InputPanel";
+import Graph from "./components/Graph";
+import IterationsTable from "./components/IterationsTable";
 
 ChartJS.register(
   LinearScale,
@@ -24,6 +26,59 @@ ChartJS.register(
   CategoryScale
 );
 
+// =========================
+// NORMALIZADOR DE FUNCIONES
+// =========================
+export const normalizarFuncion = (expr) => {
+  let r = expr.trim();
+
+  // PASO 1: Multiplicación implícita PRIMERO
+  // (para que \b funcione en pasos siguientes)
+  r = r.replace(/(\d)([a-df-zA-DF-Z])/g, "$1*$2"); // 5x→5*x (excluye e/E)
+  r = r.replace(/(\d)(e)(?!\d)/gi, "$1*$2");         // 2e^x→2*e^x (no 1e5)
+  r = r.replace(/\)([a-zA-Z(])/g, ")*$1");           // )x→)*x
+
+  // PASO 2: Nombres en español → mathjs (más largos primero)
+  const traducciones = [
+    ["arcsen", "asin"],
+    ["arccos", "acos"],
+    ["arctg",  "atan"],
+    ["senh",   "sinh"],
+    ["tgh",    "tanh"],
+    ["sen",    "sin"],
+    ["tg",     "tan"],
+    ["ctg",    "cot"],
+    ["ln",     "log"],
+  ];
+  traducciones.forEach(([sp, en]) => {
+    r = r.replace(new RegExp(`\\b${sp}`, "gi"), en);
+  });
+
+  // PASO 3: Funciones sin paréntesis → agregar paréntesis (más largos primero)
+  const funciones = [
+    "asin","acos","atan","sinh","cosh","tanh",
+    "log10","sqrt","abs","exp","log",
+    "sin","cos","tan","cot",
+  ];
+  funciones.forEach((fn) => {
+    r = r.replace(new RegExp(`\\b${fn}(x)`,   "g"), `${fn}($1)`);
+    r = r.replace(new RegExp(`\\b${fn}(\\d)`, "g"), `${fn}($1)`);
+  });
+
+  return r;
+};
+
+// Compilación pura: sin setState (evita bucle infinito en render)
+const compilar = (raw) => {
+  const normalizada = normalizarFuncion(raw);
+  try {
+    const expr = compile(normalizada);
+    return { expr, normalizada, error: null };
+  } catch (err) {
+    return { expr: null, normalizada, error: err.message };
+  }
+};
+
 export default function App() {
   const [funcion, setFuncion] = useState("x^3 - x - 2");
   const [a, setA] = useState(1);
@@ -33,437 +88,221 @@ export default function App() {
   const [iteraciones, setIteraciones] = useState([]);
   const [raiz, setRaiz] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-
+  const [funcionNormalizada, setFuncionNormalizada] = useState("");
   const [metodoActual, setMetodoActual] = useState("");
 
-  const evaluar = (expr, x) => {
-    return expr.evaluate({ x });
-  };
+  const evaluar = (expr, x) => expr.evaluate({ x });
 
   // =========================
   // MÉTODO DE BISECCIÓN
   // =========================
   const biseccion = () => {
-  try {
     setErrorMsg("");
     setMetodoActual("biseccion");
 
-    const expr = compile(funcion);
+    const { expr, normalizada, error } = compilar(funcion);
+    setFuncionNormalizada(normalizada);
+
+    if (error) { setErrorMsg(`Error de sintaxis: ${error}`); return; }
 
     let ai = parseFloat(a);
     let bi = parseFloat(b);
+    let fa, fb;
 
-    let fa = evaluar(expr, ai);
-    let fb = evaluar(expr, bi);
+    try {
+      fa = evaluar(expr, ai);
+      fb = evaluar(expr, bi);
+    } catch (err) {
+      setErrorMsg(`Error al evaluar la función: ${err.message}`);
+      return;
+    }
 
-    // Validar intervalo
     if (fa * fb > 0) {
-      setErrorMsg(
-        "f(a) y f(b) deben tener signos opuestos."
-      );
+      setErrorMsg("f(a) y f(b) deben tener signos opuestos para garantizar una raíz en el intervalo.");
       return;
     }
 
     let pasos = [];
-
-    let c;
-    let fc;
-
-    let error = Infinity;
-
+    let c, fc;
+    let error2 = Infinity;
     let anterior = null;
-
     let i = 1;
 
-    while (error > tol && i <= 100) {
-      // Punto medio
+    while (error2 > tol && i <= 100) {
       c = (ai + bi) / 2;
+      try { fc = evaluar(expr, c); }
+      catch (err) { setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`); return; }
 
-      fc = evaluar(expr, c);
+      if (anterior !== null) error2 = Math.abs(c - anterior);
+      pasos.push({ iteracion: i, a: ai, b: bi, c, fc, error: error2 === Infinity ? 0 : error2 });
 
-      // Error
-      if (anterior !== null) {
-        error = Math.abs(c - anterior);
-      }
-
-      pasos.push({
-        iteracion: i,
-        a: ai,
-        b: bi,
-        c,
-        fc,
-        error:
-          error === Infinity ? 0 : error,
-      });
-
-      // Si ya encontró raíz
-      if (Math.abs(fc) < tol) {
-        break;
-      }
-
-      // Elegir nuevo intervalo
-      if (fa * fc < 0) {
-        bi = c;
-        fb = fc;
-      } else {
-        ai = c;
-        fa = fc;
-      }
+      if (Math.abs(fc) < tol) break;
+      if (fa * fc < 0) { bi = c; fb = fc; }
+      else             { ai = c; fa = fc; }
 
       anterior = c;
-
       i++;
     }
 
     setIteraciones(pasos);
-
     setRaiz(c);
-  } catch (err) {
-    setErrorMsg("Función inválida.");
-  }
-};
+  };
+
   // =========================
   // MÉTODO NEWTON-RAPHSON
   // =========================
   const newtonRaphson = () => {
-    try {
-      setErrorMsg("");
-      setMetodoActual("newton");
+    setErrorMsg("");
+    setMetodoActual("newton");
 
-      const expr = compile(funcion);
+    const { expr, normalizada, error } = compilar(funcion);
+    setFuncionNormalizada(normalizada);
 
-      // derivada numérica
-      const derivada = (x) => {
-        const h = 0.000001;
+    if (error) { setErrorMsg(`Error de sintaxis: ${error}`); return; }
 
-        return (
-          (evaluar(expr, x + h) - evaluar(expr, x - h)) /
-          (2 * h)
-        );
-      };
+    const derivada = (x) => {
+      const h = 1e-6;
+      return (evaluar(expr, x + h) - evaluar(expr, x - h)) / (2 * h);
+    };
 
-      let x0 = parseFloat(a);
+    let x0 = parseFloat(a);
+    let pasos = [];
+    let errorVal = 100;
+    let i = 1;
 
-      let pasos = [];
-
-      let error = 100;
-
-      let i = 1;
-
-      while (error > tol && i < 100) {
-        const fx = evaluar(expr, x0);
-
-        const dfx = derivada(x0);
-
-        if (Math.abs(dfx) < 1e-10) {
-          setErrorMsg("La derivada es cero.");
-          return;
-        }
-
-        const x1 = x0 - fx / dfx;
-
-        error = Math.abs(x1 - x0);
-
-        pasos.push({
-          iteracion: i,
-          x0,
-          fx,
-          dfx,
-          x1,
-          error,
-        });
-
-        x0 = x1;
-
-        i++;
+    while (errorVal > tol && i < 100) {
+      let fx, dfx;
+      try {
+        fx  = evaluar(expr, x0);
+        dfx = derivada(x0);
+      } catch (err) {
+        setErrorMsg(`Error al evaluar en x=${x0}: ${err.message}`);
+        return;
       }
 
-      setIteraciones(pasos);
+      if (Math.abs(dfx) < 1e-10) {
+        setErrorMsg("La derivada es cero o casi cero en este punto. Elige un x₀ diferente.");
+        return;
+      }
 
-      setRaiz(x0);
-    } catch (err) {
-      setErrorMsg("Función inválida.");
+      const x1 = x0 - fx / dfx;
+      errorVal = Math.abs(x1 - x0);
+      pasos.push({ iteracion: i, x0, fx, dfx, x1, error: errorVal });
+      x0 = x1;
+      i++;
     }
+
+    setIteraciones(pasos);
+    setRaiz(x0);
   };
 
   // =========================
   // GRÁFICA
   // =========================
   const generarGrafica = () => {
-    try {
-      const expr = compile(funcion);
+    const { expr, error } = compilar(funcion);
+    if (error) return null;
 
-      const xs = [];
-      const ys = [];
+    // Rango centrado en el origen, con paso fino para mayor precisión
+    const XMIN  = -10;
+    const XMAX  = 10;
+    const PASO  = 0.1;
+    // Umbral de corte para discontinuidades (asíntotas, saltos)
+    const YCLAMP = 80;
 
-      for (let x = -10; x <= 10; x += 0.5) {
-        xs.push(x);
-        ys.push(evaluar(expr, x));
+    const xs = [];
+    const ys = [];
+
+    for (let x = XMIN; x <= XMAX + 1e-9; x += PASO) {
+      const xr = Math.round(x * 10) / 10; // evitar acumulación de punto flotante
+      xs.push(xr);
+      try {
+        const y = evaluar(expr, xr);
+        // null genera un "gap" en la curva → correcto para asíntotas
+        ys.push(isFinite(y) && Math.abs(y) <= YCLAMP ? y : null);
+      } catch {
+        ys.push(null);
       }
-
-      return {
-        labels: xs,
-        datasets: [
-          {
-            label: "f(x)",
-            data: ys,
-            borderWidth: 2,
-          },
-        ],
-      };
-    } catch {
-      return null;
     }
+
+    // Detectar saltos bruscos (posibles discontinuidades) y forzar null
+    for (let i = 1; i < ys.length - 1; i++) {
+      if (ys[i] !== null && ys[i - 1] !== null && ys[i + 1] !== null) {
+        const salto1 = Math.abs(ys[i] - ys[i - 1]);
+        const salto2 = Math.abs(ys[i + 1] - ys[i]);
+        if (salto1 > 20 || salto2 > 20) {
+          ys[i] = null; // rompe la línea en discontinuidades
+        }
+      }
+    }
+
+    const datasets = [
+      {
+        label: "f(x)",
+        data: ys,
+        borderColor: "#60a5fa",       // azul
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        pointRadius: 0,               // sin puntos individuales
+        tension: 0.2,
+      },
+    ];
+
+    // ── Marcador de raíz ──────────────────────────────────────────────
+    if (raiz !== null && raiz >= XMIN && raiz <= XMAX) {
+      // Encontrar el índice más cercano a la raíz en nuestro array xs
+      const idx = xs.reduce(
+        (best, x, i) => (Math.abs(x - raiz) < Math.abs(xs[best] - raiz) ? i : best),
+        0
+      );
+
+      // Punto en (raiz, 0) — la raíz es donde f(x)≈0
+      const rootData = xs.map(() => null);
+      rootData[idx] = 0;
+
+      datasets.push({
+        label: `Raíz ≈ ${raiz.toFixed(5)}`,
+        data: rootData,
+        borderColor: "#f87171",
+        backgroundColor: "#f87171",   // rojo
+        pointRadius: xs.map((_, i) => (i === idx ? 9 : 0)),
+        pointHoverRadius: 12,
+        pointStyle: "circle",
+        showLine: false,
+        spanGaps: false,
+      });
+    }
+
+    return { labels: xs, datasets };
   };
 
   return (
     <div className="min-h-screen p-8 bg-slate-900 text-white">
-      <h1 className="text-4xl font-bold mb-6 text-center">
-        Calculadora de Raíces
-      </h1>
+      <h1 className="text-4xl font-bold mb-6 text-center">Calculadora de Raíces</h1>
 
       <div className="grid md:grid-cols-2 gap-8">
-        {/* PANEL IZQUIERDO */}
-        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg">
-          <h2 className="text-2xl font-bold mb-4">
-            Datos
-          </h2>
+        <InputPanel
+          funcion={funcion}
+          setFuncion={setFuncion}
+          a={a}
+          setA={setA}
+          b={b}
+          setB={setB}
+          tol={tol}
+          setTol={setTol}
+          onBiseccion={biseccion}
+          onNewton={newtonRaphson}
+          raiz={raiz}
+          errorMsg={errorMsg}
+          funcionNormalizada={funcionNormalizada}
+        />
 
-          {/* FUNCIÓN */}
-          <div className="mb-4">
-            <label>Función</label>
-
-            <input
-              type="text"
-              value={funcion}
-              onChange={(e) =>
-                setFuncion(e.target.value)
-              }
-              className="w-full p-3 rounded bg-slate-700 mt-2"
-            />
-          </div>
-
-          {/* VALORES */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label>a / x0</label>
-
-              <input
-                type="number"
-                value={a}
-                onChange={(e) =>
-                  setA(e.target.value)
-                }
-                className="w-full p-3 rounded bg-slate-700 mt-2"
-              />
-            </div>
-
-            <div>
-              <label>b</label>
-
-              <input
-                type="number"
-                value={b}
-                onChange={(e) =>
-                  setB(e.target.value)
-                }
-                className="w-full p-3 rounded bg-slate-700 mt-2"
-              />
-            </div>
-          </div>
-
-          {/* TOLERANCIA */}
-          <div className="mt-4">
-            <label>Tolerancia</label>
-
-            <input
-              type="number"
-              value={tol}
-              step="0.0001"
-              onChange={(e) =>
-                setTol(e.target.value)
-              }
-              className="w-full p-3 rounded bg-slate-700 mt-2"
-            />
-          </div>
-
-          {/* BOTONES */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <button
-              onClick={biseccion}
-              className="bg-blue-600 hover:bg-blue-700 p-4 rounded-xl font-bold"
-            >
-              Bisección
-            </button>
-
-            <button
-              onClick={newtonRaphson}
-              className="bg-purple-600 hover:bg-purple-700 p-4 rounded-xl font-bold"
-            >
-              Newton
-            </button>
-          </div>
-
-          {/* RESULTADO */}
-          {raiz !== null && (
-            <div className="mt-6 bg-green-700 p-4 rounded-xl">
-              <h3 className="text-xl font-bold">
-                Raíz Aproximada
-              </h3>
-
-              <p>{raiz}</p>
-            </div>
-          )}
-
-          {/* ERROR */}
-          {errorMsg && (
-            <div className="mt-6 bg-red-700 p-4 rounded-xl">
-              {errorMsg}
-            </div>
-          )}
-        </div>
-
-        {/* GRÁFICA */}
-        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg">
-          <h2 className="text-2xl font-bold mb-4">
-            Gráfica
-          </h2>
-
-          {generarGrafica() && (
-            <Line
-              data={generarGrafica()}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: {
-                    labels: {
-                      color: "white",
-                    },
-                  },
-                },
-                scales: {
-                  x: {
-                    ticks: {
-                      color: "white",
-                    },
-                  },
-                  y: {
-                    ticks: {
-                      color: "white",
-                    },
-                  },
-                },
-              }}
-            />
-          )}
-        </div>
+        <Graph data={generarGrafica()} />
       </div>
 
-      {/* TABLA */}
       <div className="mt-10 bg-slate-800 p-6 rounded-2xl shadow-lg overflow-auto">
-        <h2 className="text-2xl font-bold mb-4">
-          Iteraciones
-        </h2>
-
-        {/* TABLA BISECCIÓN */}
-        {metodoActual === "biseccion" && (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-slate-700">
-                <th className="p-3">i</th>
-                <th className="p-3">a</th>
-                <th className="p-3">b</th>
-                <th className="p-3">c</th>
-                <th className="p-3">f(c)</th>
-                <th className="p-3">Error</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {iteraciones.map((it) => (
-                <tr
-                  key={it.iteracion}
-                  className="border-b border-slate-700 text-center"
-                >
-                  <td className="p-3">
-                    {it.iteracion}
-                  </td>
-
-                  <td className="p-3">
-                    {it.a.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.b.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.c.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.fc.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {typeof it.error === "number"
-                      ? it.error.toFixed(6)
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* TABLA NEWTON */}
-        {metodoActual === "newton" && (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-slate-700">
-                <th className="p-3">i</th>
-                <th className="p-3">x0</th>
-                <th className="p-3">f(x0)</th>
-                <th className="p-3">f'(x0)</th>
-                <th className="p-3">x1</th>
-                <th className="p-3">Error</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {iteraciones.map((it) => (
-                <tr
-                  key={it.iteracion}
-                  className="border-b border-slate-700 text-center"
-                >
-                  <td className="p-3">
-                    {it.iteracion}
-                  </td>
-
-                  <td className="p-3">
-                    {it.x0.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.fx.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.dfx.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.x1.toFixed(6)}
-                  </td>
-
-                  <td className="p-3">
-                    {it.error.toFixed(6)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <h2 className="text-2xl font-bold mb-4">Iteraciones</h2>
+        <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} />
       </div>
     </div>
   );
