@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { compile } from "mathjs";
+import { compile, derivative, simplify } from "mathjs";
 
 import {
   Chart as ChartJS,
@@ -71,11 +71,26 @@ export const normalizarFuncion = (expr) => {
 // Compilación pura: sin setState (evita bucle infinito en render)
 const compilar = (raw) => {
   const normalizada = normalizarFuncion(raw);
+
   try {
-    const expr = compile(normalizada);
-    return { expr, normalizada, error: null };
+    // SIMPLIFICAR EXPRESIÓN
+    const simplificada = simplify(normalizada).toString();
+
+    // COMPILAR
+    const expr = compile(simplificada);
+
+    return {
+      expr,
+      normalizada: simplificada,
+      error: null,
+    };
+
   } catch (err) {
-    return { expr: null, normalizada, error: err.message };
+    return {
+      expr: null,
+      normalizada,
+      error: err.message,
+    };
   }
 };
 
@@ -152,49 +167,76 @@ export default function App() {
   // MÉTODO NEWTON-RAPHSON
   // =========================
   const newtonRaphson = () => {
-    setErrorMsg("");
-    setMetodoActual("newton");
+  setErrorMsg("");
+  setMetodoActual("newton");
 
-    const { expr, normalizada, error } = compilar(funcion);
-    setFuncionNormalizada(normalizada);
+  const { expr, normalizada, error } = compilar(funcion);
 
-    if (error) { setErrorMsg(`Error de sintaxis: ${error}`); return; }
+  setFuncionNormalizada(normalizada);
 
-    const derivada = (x) => {
-      const h = 1e-6;
-      return (evaluar(expr, x + h) - evaluar(expr, x - h)) / (2 * h);
-    };
+  if (error) {
+    setErrorMsg(`Error de sintaxis: ${error}`);
+    return;
+  }
+
+  try {
+    // DERIVADA SIMBÓLICA
+    const derivadaExpr = derivative(normalizada, "x");
+
+    const derivadaCompilada = derivadaExpr.compile();
 
     let x0 = parseFloat(a);
+
     let pasos = [];
-    let errorVal = 100;
+
+    let errorVal = Infinity;
+
     let i = 1;
 
-    while (errorVal > tol && i < 100) {
-      let fx, dfx;
-      try {
-        fx  = evaluar(expr, x0);
-        dfx = derivada(x0);
-      } catch (err) {
-        setErrorMsg(`Error al evaluar en x=${x0}: ${err.message}`);
-        return;
-      }
+    while (errorVal > tol && i <= 100) {
 
-      if (Math.abs(dfx) < 1e-10) {
-        setErrorMsg("La derivada es cero o casi cero en este punto. Elige un x₀ diferente.");
+      const fx = evaluar(expr, x0);
+
+      const dfx = derivadaCompilada.evaluate({ x: x0 });
+
+      if (Math.abs(dfx) < 1e-12) {
+        setErrorMsg(
+          "La derivada es cero o muy cercana a cero."
+        );
         return;
       }
 
       const x1 = x0 - fx / dfx;
+
       errorVal = Math.abs(x1 - x0);
-      pasos.push({ iteracion: i, x0, fx, dfx, x1, error: errorVal });
+
+      pasos.push({
+        iteracion: i,
+        x0,
+        fx,
+        dfx,
+        x1,
+        error: errorVal,
+      });
+
+      if (Math.abs(fx) < tol) {
+        x0 = x1;
+        break;
+      }
+
       x0 = x1;
+
       i++;
     }
 
     setIteraciones(pasos);
+
     setRaiz(x0);
-  };
+
+  } catch (err) {
+    setErrorMsg(`Error: ${err.message}`);
+  }
+};
 
   // =========================
   // GRÁFICA
