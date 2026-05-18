@@ -1,6 +1,10 @@
 import React from "react";
 
 export default function IterationsTable({ iteraciones, metodoActual }) {
+  const fmt = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toFixed(6) : "-";
+  };
   return (
     <>
       {metodoActual === "biseccion" && (
@@ -21,15 +25,15 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
               <tr key={it.iteracion} className="border-b border-slate-700 text-center">
                 <td className="p-3">{it.iteracion}</td>
 
-                <td className="p-3">{it.a.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.a)}</td>
 
-                <td className="p-3">{it.b.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.b)}</td>
 
-                <td className="p-3">{it.c.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.c)}</td>
 
-                <td className="p-3">{it.fc.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.fc)}</td>
 
-                <td className="p-3">{typeof it.error === "number" ? it.error.toFixed(6) : "-"}</td>
+                <td className="p-3">{fmt(it.error)}</td>
               </tr>
             ))}
           </tbody>
@@ -54,15 +58,15 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
               <tr key={it.iteracion} className="border-b border-slate-700 text-center">
                 <td className="p-3">{it.iteracion}</td>
 
-                <td className="p-3">{it.x0.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.x0)}</td>
 
-                <td className="p-3">{it.fx.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.fx)}</td>
 
-                <td className="p-3">{it.dfx.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.dfx)}</td>
 
-                <td className="p-3">{it.x1.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.x1)}</td>
 
-                <td className="p-3">{it.error.toFixed(6)}</td>
+                <td className="p-3">{fmt(it.error)}</td>
               </tr>
             ))}
           </tbody>

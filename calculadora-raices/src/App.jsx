@@ -113,22 +113,35 @@ export default function App() {
   // =========================
   const biseccion = () => {
     setErrorMsg("");
-    setMetodoActual("biseccion");
+    setIteraciones([]);
 
     const { expr, normalizada, error } = compilar(funcion);
     setFuncionNormalizada(normalizada);
 
-    if (error) { setErrorMsg(`Error de sintaxis: ${error}`); return; }
+    if (error) {
+      setErrorMsg(`Error de sintaxis: ${error}`);
+      return;
+    }
 
-    let ai = parseFloat(a);
-    let bi = parseFloat(b);
+    let ai = Number(a);
+    let bi = Number(b);
+
+    if (!Number.isFinite(ai) || !Number.isFinite(bi)) {
+      setErrorMsg("Intervalo inválido.");
+      return;
+    }
+
     let fa, fb;
-
     try {
-      fa = evaluar(expr, ai);
-      fb = evaluar(expr, bi);
+      fa = Number(evaluar(expr, ai));
+      fb = Number(evaluar(expr, bi));
     } catch (err) {
       setErrorMsg(`Error al evaluar la función: ${err.message}`);
+      return;
+    }
+
+    if (!Number.isFinite(fa) || !Number.isFinite(fb)) {
+      setErrorMsg("f(a) o f(b) no es numérica en el intervalo dado.");
       return;
     }
 
@@ -137,23 +150,45 @@ export default function App() {
       return;
     }
 
+    setMetodoActual("biseccion");
+
     let pasos = [];
-    let c, fc;
+    let c = null;
+    let fc = null;
     let error2 = Infinity;
     let anterior = null;
     let i = 1;
 
-    while (error2 > tol && i <= 100) {
+    const TOL = Number(tol) || 1e-8;
+    const MAX_IT = 100;
+
+    while (error2 > TOL && i <= MAX_IT) {
       c = (ai + bi) / 2;
-      try { fc = evaluar(expr, c); }
-      catch (err) { setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`); return; }
+      try {
+        fc = Number(evaluar(expr, c));
+      } catch (err) {
+        setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`);
+        return;
+      }
+
+      if (!Number.isFinite(fc)) {
+        setErrorMsg(`f(c) no es numérica en c=${c}`);
+        return;
+      }
 
       if (anterior !== null) error2 = Math.abs(c - anterior);
+
       pasos.push({ iteracion: i, a: ai, b: bi, c, fc, error: error2 === Infinity ? 0 : error2 });
 
-      if (Math.abs(fc) < tol) break;
-      if (fa * fc < 0) { bi = c; fb = fc; }
-      else             { ai = c; fa = fc; }
+      if (Math.abs(fc) < TOL) break;
+
+      if (fa * fc < 0) {
+        bi = c;
+        fb = fc;
+      } else {
+        ai = c;
+        fa = fc;
+      }
 
       anterior = c;
       i++;
@@ -164,79 +199,145 @@ export default function App() {
   };
 
   // =========================
+  // RESET / REFRESH
+  // =========================
+  const resetAll = () => {
+    setFuncion("");
+    setIteraciones([]);
+    setRaiz(null);
+    setErrorMsg("");
+    setFuncionNormalizada("");
+    setMetodoActual("");
+  };
+
+  // =========================
   // MÉTODO NEWTON-RAPHSON
   // =========================
   const newtonRaphson = () => {
-  setErrorMsg("");
-  setMetodoActual("newton");
+    setErrorMsg("");
+    setIteraciones([]);
 
-  const { expr, normalizada, error } = compilar(funcion);
+    const { expr, normalizada, error } = compilar(funcion);
+    setFuncionNormalizada(normalizada);
 
-  setFuncionNormalizada(normalizada);
-
-  if (error) {
-    setErrorMsg(`Error de sintaxis: ${error}`);
-    return;
-  }
-
-  try {
-    // DERIVADA SIMBÓLICA
-    const derivadaExpr = derivative(normalizada, "x");
-
-    const derivadaCompilada = derivadaExpr.compile();
-
-    let x0 = parseFloat(a);
-
-    let pasos = [];
-
-    let errorVal = Infinity;
-
-    let i = 1;
-
-    while (errorVal > tol && i <= 100) {
-
-      const fx = evaluar(expr, x0);
-
-      const dfx = derivadaCompilada.evaluate({ x: x0 });
-
-      if (Math.abs(dfx) < 1e-12) {
-        setErrorMsg(
-          "La derivada es cero o muy cercana a cero."
-        );
-        return;
-      }
-
-      const x1 = x0 - fx / dfx;
-
-      errorVal = Math.abs(x1 - x0);
-
-      pasos.push({
-        iteracion: i,
-        x0,
-        fx,
-        dfx,
-        x1,
-        error: errorVal,
-      });
-
-      if (Math.abs(fx) < tol) {
-        x0 = x1;
-        break;
-      }
-
-      x0 = x1;
-
-      i++;
+    if (error) {
+      setErrorMsg(`Error de sintaxis: ${error}`);
+      return;
     }
 
-    setIteraciones(pasos);
+    setMetodoActual("newton");
 
-    setRaiz(x0);
+    try {
+      // DERIVADA SIMBÓLICA
+      const derivadaExpr = derivative(normalizada, "x");
+      const derivadaCompilada = derivadaExpr.compile();
 
-  } catch (err) {
-    setErrorMsg(`Error: ${err.message}`);
-  }
-};
+      let x0 = Number(a);
+      const TOL = Number(tol) || 1e-8;
+
+      let pasos = [];
+      let errorVal = Infinity;
+      let i = 1;
+      const MAX_IT = 100;
+      const EPS_DERIV = 1e-12;
+
+      while (errorVal > TOL && i <= MAX_IT) {
+        let fx;
+        try { fx = Number(evaluar(expr, x0)); }
+        catch (err) { setErrorMsg(`Error al evaluar f en x=${x0}: ${err.message}`); return; }
+
+        let dfxRaw;
+        try {
+          dfxRaw = derivadaCompilada.evaluate({ x: x0 });
+        } catch (err) {
+          setErrorMsg(`No se pudo evaluar la derivada en x=${x0}: ${err.message}`);
+          return;
+        }
+
+        let dfx = Number(dfxRaw);
+
+        // Si derivada muy pequeña o no numérica, intentar perturbar el punto inicial
+        if (!Number.isFinite(dfx) || Math.abs(dfx) < EPS_DERIV) {
+          let found = false;
+          const deltas = [1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1];
+
+          for (const delta of deltas) {
+            try {
+              const dposRaw = derivadaCompilada.evaluate({ x: x0 + delta });
+              const dpos = Number(dposRaw);
+              if (Number.isFinite(dpos) && Math.abs(dpos) >= EPS_DERIV) {
+                pasos.push({ iteracion: i, x0, fx, dfx: dpos, x1: x0 + delta, error: Math.abs(delta) });
+                x0 = x0 + delta;
+                dfx = dpos;
+                found = true;
+                i++;
+                break;
+              }
+
+              const dnegRaw = derivadaCompilada.evaluate({ x: x0 - delta });
+              const dneg = Number(dnegRaw);
+              if (Number.isFinite(dneg) && Math.abs(dneg) >= EPS_DERIV) {
+                pasos.push({ iteracion: i, x0, fx, dfx: dneg, x1: x0 - delta, error: Math.abs(delta) });
+                x0 = x0 - delta;
+                dfx = dneg;
+                found = true;
+                i++;
+                break;
+              }
+            } catch (e) {
+              // ignorar y seguir probando
+            }
+          }
+
+          if (!found) {
+            // Fallback: aproximar derivada con secante usando x0 y x0+delta
+            const delta = 1e-3;
+            const xPrev = x0 + delta;
+            let fxPrev;
+            try {
+              fxPrev = Number(evaluar(expr, xPrev));
+            } catch (err) {
+              setErrorMsg(`No se pudo evaluar f(x) para fallback secante: ${err.message}`);
+              return;
+            }
+
+            if (fxPrev === fx) {
+              setErrorMsg("La derivada es cero y no se pudo aplicar un método alternativo.");
+              return;
+            }
+
+            const approxD = (fx - fxPrev) / (x0 - xPrev);
+            const x1 = x0 - (fx * (x0 - xPrev)) / (fx - fxPrev);
+
+            errorVal = Math.abs(x1 - x0);
+            pasos.push({ iteracion: i, x0, fx, dfx: approxD, x1, error: errorVal });
+            x0 = x1;
+            i++;
+            continue;
+          }
+        }
+
+        // Paso Newton normal
+        const x1 = x0 - fx / dfx;
+        errorVal = Math.abs(x1 - x0);
+
+        pasos.push({ iteracion: i, x0, fx, dfx, x1, error: errorVal });
+
+        if (Math.abs(fx) < TOL) {
+          x0 = x1;
+          break;
+        }
+
+        x0 = x1;
+        i++;
+      }
+
+      setIteraciones(pasos);
+      setRaiz(x0);
+    } catch (err) {
+      setErrorMsg(`Error: ${err.message}`);
+    }
+  };
 
   // =========================
   // GRÁFICA
@@ -334,6 +435,7 @@ export default function App() {
           setTol={setTol}
           onBiseccion={biseccion}
           onNewton={newtonRaphson}
+          onReset={resetAll}
           raiz={raiz}
           errorMsg={errorMsg}
           funcionNormalizada={funcionNormalizada}

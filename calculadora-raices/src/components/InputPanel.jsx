@@ -22,7 +22,7 @@ export default function InputPanel({
   a, setA,
   b, setB,
   tol, setTol,
-  onBiseccion, onNewton,
+  onBiseccion, onNewton, onReset,
   raiz, errorMsg,
   funcionNormalizada,
 }) {
@@ -36,12 +36,23 @@ export default function InputPanel({
       <div className="mb-4">
         <div className="flex items-center justify-between">
           <label className="font-semibold">Función f(x)</label>
-          <button
-            onClick={() => setMostrarHints(!mostrarHints)}
-            className="text-xs text-blue-400 hover:text-blue-300 underline"
-          >
-            {mostrarHints ? "Ocultar ayuda" : "¿Cómo escribir funciones?"}
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMostrarHints(!mostrarHints)}
+              className="text-xs text-blue-400 hover:text-blue-300 underline"
+            >
+              {mostrarHints ? "Ocultar ayuda" : "¿Cómo escribir funciones?"}
+            </button>
+
+            <button
+              onClick={onReset}
+              className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded-md"
+              title="Refrescar"
+            >
+              Refrescar
+            </button>
+          </div>
         </div>
 
         <input
