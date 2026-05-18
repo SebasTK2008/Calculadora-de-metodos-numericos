@@ -340,84 +340,240 @@ export default function App() {
   };
 
   // =========================
+// MÉTODO DE LA SECANTE
+// =========================
+const secante = () => {
+  setErrorMsg("");
+  setIteraciones([]);
+
+  const { expr, normalizada, error } = compilar(funcion);
+  setFuncionNormalizada(normalizada);
+
+  if (error) {
+    setErrorMsg(`Error de sintaxis: ${error}`);
+    return;
+  }
+
+  setMetodoActual("secante");
+
+  let x0 = Number(a);
+  let x1 = Number(b);
+
+  const TOL = Number(tol) || 1e-8;
+  const MAX_IT = 100;
+
+  let pasos = [];
+  let errorVal = Infinity;
+  let i = 1;
+
+  while (errorVal > TOL && i <= MAX_IT) {
+    let fx0, fx1;
+
+    try {
+      fx0 = Number(evaluar(expr, x0));
+      fx1 = Number(evaluar(expr, x1));
+    } catch (err) {
+      setErrorMsg(`Error al evaluar la función: ${err.message}`);
+      return;
+    }
+
+    if (!Number.isFinite(fx0) || !Number.isFinite(fx1)) {
+      setErrorMsg("La función devolvió valores no numéricos.");
+      return;
+    }
+
+    const denominador = fx1 - fx0;
+
+    if (Math.abs(denominador) < 1e-14) {
+      setErrorMsg("División por cero en el método de la secante.");
+      return;
+    }
+
+    const x2 = x1 - (fx1 * (x1 - x0)) / denominador;
+
+    errorVal = Math.abs(x2 - x1);
+
+    pasos.push({
+      iteracion: i,
+      x0,
+      x1,
+      fx0,
+      fx1,
+      x2,
+      error: errorVal,
+    });
+
+    if (Math.abs(fx1) < TOL) break;
+
+    x0 = x1;
+    x1 = x2;
+
+    i++;
+  }
+
+  setIteraciones(pasos);
+  setRaiz(x1);
+};
+
+// =========================
+// MÉTODO DE FALSA POSICIÓN
+// =========================
+const falsaPosicion = () => {
+  setErrorMsg("");
+  setIteraciones([]);
+
+  const { expr, normalizada, error } = compilar(funcion);
+  setFuncionNormalizada(normalizada);
+
+  if (error) {
+    setErrorMsg(`Error de sintaxis: ${error}`);
+    return;
+  }
+
+  setMetodoActual("falsaPosicion");
+
+  let ai = Number(a);
+  let bi = Number(b);
+
+  const TOL = Number(tol) || 1e-8;
+  const MAX_IT = 100;
+
+  let fa, fb;
+
+  try {
+    fa = Number(evaluar(expr, ai));
+    fb = Number(evaluar(expr, bi));
+  } catch (err) {
+    setErrorMsg(`Error al evaluar la función: ${err.message}`);
+    return;
+  }
+
+  if (fa * fb > 0) {
+    setErrorMsg("f(a) y f(b) deben tener signos opuestos.");
+    return;
+  }
+
+  let pasos = [];
+  let c = null;
+  let errorVal = Infinity;
+  let anterior = null;
+  let i = 1;
+
+  while (errorVal > TOL && i <= MAX_IT) {
+    c = bi - (fb * (bi - ai)) / (fb - fa);
+
+    let fc;
+
+    try {
+      fc = Number(evaluar(expr, c));
+    } catch (err) {
+      setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`);
+      return;
+    }
+
+    if (anterior !== null) {
+      errorVal = Math.abs(c - anterior);
+    }
+
+    pasos.push({
+      iteracion: i,
+      a: ai,
+      b: bi,
+      c,
+      fc,
+      error: errorVal === Infinity ? 0 : errorVal,
+    });
+
+    if (Math.abs(fc) < TOL) break;
+
+    if (fa * fc < 0) {
+      bi = c;
+      fb = fc;
+    } else {
+      ai = c;
+      fa = fc;
+    }
+
+    anterior = c;
+    i++;
+  }
+
+  setIteraciones(pasos);
+  setRaiz(c);
+};
+
+  // =========================
   // GRÁFICA
   // =========================
   const generarGrafica = () => {
-    const { expr, error } = compilar(funcion);
-    if (error) return null;
+  const { expr, error } = compilar(funcion);
+  if (error) return null;
 
-    // Rango centrado en el origen, con paso fino para mayor precisión
-    const XMIN  = -10;
-    const XMAX  = 10;
-    const PASO  = 0.1;
-    // Umbral de corte para discontinuidades (asíntotas, saltos)
-    const YCLAMP = 80;
+  const XMIN = -10;
+  const XMAX = 10;
 
-    const xs = [];
-    const ys = [];
+  // MÁS PRECISIÓN
+  const PASO = 0.02;
 
-    for (let x = XMIN; x <= XMAX + 1e-9; x += PASO) {
-      const xr = Math.round(x * 10) / 10; // evitar acumulación de punto flotante
-      xs.push(xr);
-      try {
-        const y = evaluar(expr, xr);
-        // null genera un "gap" en la curva → correcto para asíntotas
-        ys.push(isFinite(y) && Math.abs(y) <= YCLAMP ? y : null);
-      } catch {
-        ys.push(null);
-      }
-    }
+  const YCLAMP = 80;
 
-    // Detectar saltos bruscos (posibles discontinuidades) y forzar null
-    for (let i = 1; i < ys.length - 1; i++) {
-      if (ys[i] !== null && ys[i - 1] !== null && ys[i + 1] !== null) {
-        const salto1 = Math.abs(ys[i] - ys[i - 1]);
-        const salto2 = Math.abs(ys[i + 1] - ys[i]);
-        if (salto1 > 20 || salto2 > 20) {
-          ys[i] = null; // rompe la línea en discontinuidades
-        }
-      }
-    }
+  const puntos = [];
 
-    const datasets = [
-      {
-        label: "f(x)",
-        data: ys,
-        borderColor: "#60a5fa",       // azul
-        backgroundColor: "transparent",
-        borderWidth: 2,
-        pointRadius: 0,               // sin puntos individuales
-        tension: 0.2,
-      },
-    ];
+  for (let x = XMIN; x <= XMAX; x += PASO) {
+    try {
+      const y = evaluar(expr, x);
 
-    // ── Marcador de raíz ──────────────────────────────────────────────
-    if (raiz !== null && raiz >= XMIN && raiz <= XMAX) {
-      // Encontrar el índice más cercano a la raíz en nuestro array xs
-      const idx = xs.reduce(
-        (best, x, i) => (Math.abs(x - raiz) < Math.abs(xs[best] - raiz) ? i : best),
-        0
-      );
+      puntos.push({
+        x,
+        y: isFinite(y) && Math.abs(y) <= YCLAMP ? y : null,
+      });
 
-      // Punto en (raiz, 0) — la raíz es donde f(x)≈0
-      const rootData = xs.map(() => null);
-      rootData[idx] = 0;
-
-      datasets.push({
-        label: `Raíz ≈ ${raiz.toFixed(5)}`,
-        data: rootData,
-        borderColor: "#f87171",
-        backgroundColor: "#f87171",   // rojo
-        pointRadius: xs.map((_, i) => (i === idx ? 9 : 0)),
-        pointHoverRadius: 12,
-        pointStyle: "circle",
-        showLine: false,
-        spanGaps: false,
+    } catch {
+      puntos.push({
+        x,
+        y: null,
       });
     }
+  }
 
-    return { labels: xs, datasets };
+  const datasets = [
+    {
+      label: "f(x)",
+      data: puntos,
+      parsing: false,
+      borderColor: "#60a5fa",
+      backgroundColor: "transparent",
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0,
+      spanGaps: false,
+    },
+  ];
+
+  // MARCADOR DE RAÍZ EXACTO
+  if (raiz !== null && isFinite(raiz)) {
+    datasets.push({
+      label: `Raíz ≈ ${raiz.toFixed(6)}`,
+      data: [
+        {
+          x: raiz,
+          y: 0,
+        },
+      ],
+      parsing: false,
+      borderColor: "#f87171",
+      backgroundColor: "#f87171",
+      pointRadius: 8,
+      pointHoverRadius: 10,
+      pointStyle: "circle",
+      showLine: false,
+    });
+  }
+
+  return {
+    datasets,
   };
+};
 
   return (
     <div className="min-h-screen p-8 bg-slate-900 text-white">
@@ -435,6 +591,8 @@ export default function App() {
           setTol={setTol}
           onBiseccion={biseccion}
           onNewton={newtonRaphson}
+          onSecante={secante}
+          onFalsaPosicion={falsaPosicion}
           onReset={resetAll}
           raiz={raiz}
           errorMsg={errorMsg}

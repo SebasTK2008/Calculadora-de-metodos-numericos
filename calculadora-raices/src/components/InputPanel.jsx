@@ -22,7 +22,8 @@ export default function InputPanel({
   a, setA,
   b, setB,
   tol, setTol,
-  onBiseccion, onNewton, onReset,
+  onBiseccion, onNewton,onSecante,
+  onFalsaPosicion, onReset,
   raiz, errorMsg,
   funcionNormalizada,
 }) {
@@ -137,7 +138,20 @@ export default function InputPanel({
       </div>
 
       {/* ── Botones ── */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <button
+          onClick={onSecante}
+          className="bg-emerald-600 hover:bg-emerald-700 p-4 rounded-xl font-bold transition-colors"
+        >
+          Secante
+        </button>
+
+        <button
+          onClick={onFalsaPosicion}
+          className="bg-orange-600 hover:bg-orange-700 p-4 rounded-xl font-bold transition-colors"
+        >
+          Falsa Posición
+        </button>
         <button
           onClick={onBiseccion}
           className="bg-blue-600 hover:bg-blue-700 p-4 rounded-xl font-bold transition-colors"

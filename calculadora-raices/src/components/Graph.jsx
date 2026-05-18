@@ -3,56 +3,72 @@ import { Line } from "react-chartjs-2";
 
 export default function Graph({ data }) {
   const options = {
-    responsive: true,
-    spanGaps: false, // gaps en discontinuidades (null values)
-    animation: { duration: 300 },
-    plugins: {
-      legend: {
-        labels: {
-          color: "white",
-          usePointStyle: true,
-          pointStyleWidth: 12,
-        },
+  responsive: true,
+  animation: { duration: 300 },
+  spanGaps: false,
+
+  plugins: {
+    legend: {
+      labels: {
+        color: "white",
+        usePointStyle: true,
       },
-      tooltip: {
-        callbacks: {
-          label: (ctx) => {
-            if (ctx.raw === null) return null;
-            return ` ${ctx.dataset.label}: ${Number(ctx.raw).toFixed(4)}`;
-          },
+    },
+
+    tooltip: {
+      callbacks: {
+        label: (ctx) => {
+          if (!ctx.raw) return "";
+
+          return `(${ctx.raw.x.toFixed(4)}, ${ctx.raw.y.toFixed(4)})`;
         },
       },
     },
-    scales: {
-      x: {
-        ticks: {
-          color: "rgba(255,255,255,0.6)",
-          maxTicksLimit: 11,
-          callback: (_, i, ticks) => {
-            // Mostrar solo algunos valores del eje x
-            const step = Math.floor(ticks.length / 10) || 1;
-            return i % step === 0 ? data?.labels?.[i] : "";
-          },
-        },
-        grid: {
-          color: (ctx) =>
-            ctx.tick?.value === 0
-              ? "rgba(255,255,255,0.4)"   // eje y (x=0) más visible
-              : "rgba(255,255,255,0.07)",
-        },
+  },
+
+  scales: {
+    x: {
+      type: "linear",
+
+      min: -10,
+      max: 10,
+
+      ticks: {
+        color: "rgba(255,255,255,0.7)",
+
+        stepSize: 1,
+
+        callback: (value) => value,
       },
-      y: {
-        ticks: { color: "rgba(255,255,255,0.6)" },
-        grid: {
-          color: (ctx) =>
-            ctx.tick?.value === 0
-              ? "rgba(255,255,255,0.5)"   // eje x (y=0) bien visible
-              : "rgba(255,255,255,0.07)",
-          lineWidth: (ctx) => (ctx.tick?.value === 0 ? 2 : 1),
-        },
+
+      grid: {
+        color: (ctx) =>
+          ctx.tick.value === 0
+            ? "rgba(255,255,255,0.45)"
+            : "rgba(255,255,255,0.07)",
+
+        lineWidth: (ctx) =>
+          ctx.tick.value === 0 ? 2 : 1,
       },
     },
-  };
+
+    y: {
+      ticks: {
+        color: "rgba(255,255,255,0.7)",
+      },
+
+      grid: {
+        color: (ctx) =>
+          ctx.tick.value === 0
+            ? "rgba(255,255,255,0.45)"
+            : "rgba(255,255,255,0.07)",
+
+        lineWidth: (ctx) =>
+          ctx.tick.value === 0 ? 2 : 1,
+      },
+    },
+  },
+};
 
   return (
     <div className="bg-slate-800 p-6 rounded-2xl shadow-lg">
