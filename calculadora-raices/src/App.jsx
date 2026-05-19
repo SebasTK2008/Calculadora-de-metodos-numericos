@@ -579,6 +579,7 @@ const falsaPosicion = () => {
     <div className="min-h-screen flex flex-col p-8 bg-slate-900 text-white">
       <div className="flex-grow">
         <h1 className="text-4xl font-bold mb-6 text-center">Calculadora de Raíces</h1>
+        <h3 className="text-2xl font-bold mb-2 text-center">(métodos numéricos)</h3>
 
         <div className="grid md:grid-cols-2 gap-8">
           <InputPanel
