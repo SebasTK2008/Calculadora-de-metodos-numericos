@@ -576,36 +576,40 @@ const falsaPosicion = () => {
 };
 
   return (
-    <div className="min-h-screen p-8 bg-slate-900 text-white">
-      <h1 className="text-4xl font-bold mb-6 text-center">Calculadora de Raíces</h1>
+    <div className="min-h-screen flex flex-col p-8 bg-slate-900 text-white">
+      <div className="flex-grow">
+        <h1 className="text-4xl font-bold mb-6 text-center">Calculadora de Raíces</h1>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <InputPanel
-          funcion={funcion}
-          setFuncion={setFuncion}
-          a={a}
-          setA={setA}
-          b={b}
-          setB={setB}
-          tol={tol}
-          setTol={setTol}
-          onBiseccion={biseccion}
-          onNewton={newtonRaphson}
-          onSecante={secante}
-          onFalsaPosicion={falsaPosicion}
-          onReset={resetAll}
-          raiz={raiz}
-          errorMsg={errorMsg}
-          funcionNormalizada={funcionNormalizada}
-        />
+        <div className="grid md:grid-cols-2 gap-8">
+          <InputPanel
+            funcion={funcion}
+            setFuncion={setFuncion}
+            a={a}
+            setA={setA}
+            b={b}
+            setB={setB}
+            tol={tol}
+            setTol={setTol}
+            onBiseccion={biseccion}
+            onNewton={newtonRaphson}
+            onSecante={secante}
+            onFalsaPosicion={falsaPosicion}
+            onReset={resetAll}
+            raiz={raiz}
+            errorMsg={errorMsg}
+            funcionNormalizada={funcionNormalizada}
+          />
 
-        <Graph data={generarGrafica()} />
+          <Graph data={generarGrafica()} />
+        </div>
+
+        <div className="mt-10 bg-slate-800 p-6 rounded-2xl shadow-lg overflow-auto">
+          <h2 className="text-2xl font-bold mb-4">Iteraciones</h2>
+          <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} />
+        </div>
       </div>
 
-      <div className="mt-10 bg-slate-800 p-6 rounded-2xl shadow-lg overflow-auto">
-        <h2 className="text-2xl font-bold mb-4">Iteraciones</h2>
-        <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} />
-      </div>
+    
     </div>
   );
 }
