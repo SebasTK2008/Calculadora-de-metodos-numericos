@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { compile, derivative, simplify } from "mathjs";
+import ConvergenceGraph from "./components/ConvergenceGraph";
 
 import {
   Chart as ChartJS,
@@ -105,6 +106,21 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState("");
   const [funcionNormalizada, setFuncionNormalizada] = useState("");
   const [metodoActual, setMetodoActual] = useState("");
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("theme") || "dark";
+    } catch {
+      return "dark";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {}
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   const evaluar = (expr, x) => expr.evaluate({ x });
 
@@ -576,10 +592,31 @@ const falsaPosicion = () => {
 };
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-slate-900 text-white">
+    <div
+      className={`min-h-screen flex flex-col p-8 ${
+        theme === "dark" ? "bg-slate-900 text-white" : "bg-white text-slate-900"
+      }`}
+    >
       <div className="flex-grow">
-        <h1 className="text-4xl font-bold mb-6 text-center">Calculadora de Raíces</h1>
-        <h3 className="text-2xl font-bold mb-2 text-center">(métodos numéricos)</h3>
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold">Calculadora de Raíces</h1>
+            <h3 className="text-2xl font-bold mt-2">(métodos numéricos)</h3>
+          </div>
+
+          <div>
+            <button
+              onClick={toggleTheme}
+              className={`px-4 py-2 rounded-md ${
+                theme === "dark"
+                  ? "bg-slate-700 text-white hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-900 hover:bg-slate-200"
+              }`}
+            >
+              {theme === "dark" ? "🌙 Oscuro" : "☀️ Claro"}
+            </button>
+          </div>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8">
           <InputPanel
@@ -599,14 +636,16 @@ const falsaPosicion = () => {
             raiz={raiz}
             errorMsg={errorMsg}
             funcionNormalizada={funcionNormalizada}
+            theme={theme}
           />
 
-          <Graph data={generarGrafica()} />
+          <Graph data={generarGrafica()} theme={theme} />
         </div>
 
-        <div className="mt-10 bg-slate-800 p-6 rounded-2xl shadow-lg overflow-auto">
+        <div className={`mt-10 p-6 rounded-2xl shadow-lg overflow-auto ${theme === 'dark' ? 'bg-slate-800' : 'bg-white border border-slate-200'}`}>
           <h2 className="text-2xl font-bold mb-4">Iteraciones</h2>
-          <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} />
+          <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} theme={theme} />
+          <ConvergenceGraph iteraciones={iteraciones} theme={theme} />
         </div>
       </div>
 

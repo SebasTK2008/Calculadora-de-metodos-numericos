@@ -18,19 +18,33 @@ const HINTS = [
 ];
 
 export default function InputPanel({
-  funcion, setFuncion,
-  a, setA,
-  b, setB,
-  tol, setTol,
-  onBiseccion, onNewton,onSecante,
-  onFalsaPosicion, onReset,
-  raiz, errorMsg,
+  funcion,
+  setFuncion,
+  a,
+  setA,
+  b,
+  setB,
+  tol,
+  setTol,
+  onBiseccion,
+  onNewton,
+  onSecante,
+  onFalsaPosicion,
+  onReset,
+  raiz,
+  errorMsg,
   funcionNormalizada,
+  theme,
 }) {
   const [mostrarHints, setMostrarHints] = useState(false);
+  const isDark = theme === "dark";
 
   return (
-    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg">
+    <div
+      className={`p-6 rounded-2xl shadow-lg ${
+        isDark ? "bg-slate-800" : "bg-white border border-slate-200"
+      }`}
+    >
       <h2 className="text-2xl font-bold mb-4">Datos</h2>
 
       {/* ── Función ── */}
@@ -41,14 +55,14 @@ export default function InputPanel({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMostrarHints(!mostrarHints)}
-              className="text-xs text-blue-400 hover:text-blue-300 underline"
+              className={`text-xs underline ${isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'}`}
             >
               {mostrarHints ? "Ocultar ayuda" : "¿Cómo escribir funciones?"}
             </button>
 
             <button
               onClick={onReset}
-              className="text-xs bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded-md"
+              className={`text-xs px-2 py-1 rounded-md ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'}`}
               title="Refrescar"
             >
               Refrescar
@@ -60,7 +74,7 @@ export default function InputPanel({
           type="text"
           value={funcion}
           onChange={(e) => setFuncion(e.target.value)}
-          className="w-full p-3 rounded bg-slate-700 mt-2 font-mono"
+          className={`w-full p-3 rounded mt-2 font-mono ${isDark ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-900'}`}
           placeholder="Ej: x^3 - x - 2"
         />
 
@@ -74,27 +88,27 @@ export default function InputPanel({
       </div>
 
       {/* ── Panel de ayuda ── */}
-      {mostrarHints && (
-        <div className="mb-4 p-4 bg-slate-700 rounded-xl text-sm">
-          <p className="font-bold text-blue-300 mb-2">Sintaxis aceptada</p>
+        {mostrarHints && (
+        <div className={`mb-4 p-4 rounded-xl text-sm ${isDark ? 'bg-slate-700' : 'bg-slate-50'}`}>
+          <p className={`font-bold mb-2 ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>Sintaxis aceptada</p>
           <table className="w-full text-xs">
             <tbody>
               {HINTS.map((h, i) => (
-                <tr key={i} className="border-b border-slate-600">
-                  <td className="py-1 pr-3 font-mono text-green-300">{h.entrada}</td>
-                  <td className="py-1 text-slate-300">{h.desc}</td>
+                <tr key={i} className={`border-b ${isDark ? 'border-slate-600' : 'border-slate-200'}`}>
+                  <td className={`py-1 pr-3 font-mono ${isDark ? 'text-green-300' : 'text-green-700'}`}>{h.entrada}</td>
+                  <td className={`py-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{h.desc}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           <p className="font-bold text-blue-300 mt-3 mb-2">Ejemplos rápidos</p>
-          <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
             {EJEMPLOS.map((ej) => (
               <button
                 key={ej}
                 onClick={() => setFuncion(ej)}
-                className="bg-slate-600 hover:bg-slate-500 px-2 py-1 rounded font-mono text-xs"
+                className={`${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} px-2 py-1 rounded font-mono text-xs`}
               >
                 {ej}
               </button>
@@ -111,7 +125,7 @@ export default function InputPanel({
             type="number"
             value={a}
             onChange={(e) => setA(e.target.value)}
-            className="w-full p-3 rounded bg-slate-700 mt-2"
+            className={`w-full p-3 rounded mt-2 ${isDark ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-900'}`}
           />
         </div>
         <div>
@@ -120,7 +134,7 @@ export default function InputPanel({
             type="number"
             value={b}
             onChange={(e) => setB(e.target.value)}
-            className="w-full p-3 rounded bg-slate-700 mt-2"
+            className={`w-full p-3 rounded mt-2 ${isDark ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-900'}`}
           />
         </div>
       </div>
@@ -133,7 +147,7 @@ export default function InputPanel({
           value={tol}
           step="0.0001"
           onChange={(e) => setTol(e.target.value)}
-          className="w-full p-3 rounded bg-slate-700 mt-2"
+          className={`w-full p-3 rounded mt-2 ${isDark ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-900'}`}
         />
       </div>
 
@@ -141,7 +155,7 @@ export default function InputPanel({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
         <button
           onClick={onSecante}
-          className="bg-emerald-600 hover:bg-emerald-700 p-4 rounded-xl font-bold transition-colors"
+          className={`p-4 rounded-xl font-bold transition-colors ${isDark ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
         >
           Secante
         </button>
@@ -168,7 +182,7 @@ export default function InputPanel({
 
       {/* ── Resultado ── */}
       {raiz !== null && (
-        <div className="mt-6 bg-green-700 p-4 rounded-xl">
+        <div className={`mt-6 p-4 rounded-xl ${isDark ? 'bg-green-700 text-white' : 'bg-green-100 text-slate-900'}`}>
           <h3 className="text-xl font-bold">Raíz Aproximada</h3>
           <p className="font-mono text-lg mt-1">{raiz}</p>
         </div>
@@ -176,9 +190,9 @@ export default function InputPanel({
 
       {/* ── Error ── */}
       {errorMsg && (
-        <div className="mt-6 bg-red-800 border border-red-500 p-4 rounded-xl">
-          <p className="font-bold text-red-200 mb-1">⚠ Error</p>
-          <p className="text-sm font-mono text-red-100">{errorMsg}</p>
+        <div className={`mt-6 p-4 rounded-xl ${isDark ? 'bg-red-800 border border-red-500 text-red-100' : 'bg-red-100 border border-red-300 text-red-800'}`}>
+          <p className={`font-bold mb-1 ${isDark ? 'text-red-200' : 'text-red-700'}`}>⚠ Error</p>
+          <p className="text-sm font-mono">{errorMsg}</p>
         </div>
       )}
     </div>

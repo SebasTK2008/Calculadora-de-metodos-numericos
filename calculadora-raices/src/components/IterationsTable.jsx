@@ -1,10 +1,12 @@
 import React from "react";
 
-export default function IterationsTable({ iteraciones, metodoActual }) {
+export default function IterationsTable({ iteraciones, metodoActual, theme }) {
   const fmt = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n.toFixed(6) : "-";
   };
+
+  const isDark = theme === "dark";
 
   return (
     <>
@@ -14,7 +16,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
       {metodoActual === "biseccion" && (
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-700">
+            <tr className={`${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
               <th className="p-3">i</th>
               <th className="p-3">a</th>
               <th className="p-3">b</th>
@@ -28,7 +30,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
             {iteraciones.map((it) => (
               <tr
                 key={it.iteracion}
-                className="border-b border-slate-700 text-center"
+                className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} text-center`}
               >
                 <td className="p-3">{it.iteracion}</td>
 
@@ -53,7 +55,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
       {metodoActual === "newton" && (
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-700">
+            <tr className={`${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
               <th className="p-3">i</th>
               <th className="p-3">x₀</th>
               <th className="p-3">f(x₀)</th>
@@ -67,7 +69,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
             {iteraciones.map((it) => (
               <tr
                 key={it.iteracion}
-                className="border-b border-slate-700 text-center"
+                className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} text-center`}
               >
                 <td className="p-3">{it.iteracion}</td>
 
@@ -92,7 +94,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
       {metodoActual === "secante" && (
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-700">
+            <tr className={`${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
               <th className="p-3">i</th>
               <th className="p-3">x₀</th>
               <th className="p-3">x₁</th>
@@ -107,7 +109,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
             {iteraciones.map((it) => (
               <tr
                 key={it.iteracion}
-                className="border-b border-slate-700 text-center"
+                className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} text-center`}
               >
                 <td className="p-3">{it.iteracion}</td>
 
@@ -134,7 +136,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
       {metodoActual === "falsaPosicion" && (
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-slate-700">
+            <tr className={`${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
               <th className="p-3">i</th>
               <th className="p-3">a</th>
               <th className="p-3">b</th>
@@ -148,7 +150,7 @@ export default function IterationsTable({ iteraciones, metodoActual }) {
             {iteraciones.map((it) => (
               <tr
                 key={it.iteracion}
-                className="border-b border-slate-700 text-center"
+                className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'} text-center`}
               >
                 <td className="p-3">{it.iteracion}</td>
 

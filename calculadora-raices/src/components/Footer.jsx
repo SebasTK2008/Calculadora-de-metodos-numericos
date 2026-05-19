@@ -12,9 +12,9 @@ export default function Footer() {
         </div>
 
         <div className="text-sm text-right">
-          <a href="tel:+573241704274" className="inline-flex items-center gap-2 hover:text-white transition-colors">
-            <span className="text-lg">📞</span>
-            <span>3241704274</span>
+          <a href="mailto:salcendra@unimagdalena.edu.co" className="inline-flex items-center gap-2 hover:text-white transition-colors">
+            <span className="text-lg">📧</span>
+            <span>salcendra@unimagdalena.edu.co</span>
           </a>
           <div className="text-xs text-slate-500 mt-1">© {year} Sebastian Alcendra</div>
         </div>
