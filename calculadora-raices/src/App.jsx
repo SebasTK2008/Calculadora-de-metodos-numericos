@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { compile, derivative, simplify } from "mathjs";
+
 import ConvergenceGraph from "./components/ConvergenceGraph";
+import InputPanel from "./components/InputPanel";
+import Graph from "./components/Graph";
+import IterationsTable from "./components/IterationsTable";
 
 import {
   Chart as ChartJS,
@@ -12,10 +16,6 @@ import {
   Legend,
   CategoryScale,
 } from "chart.js";
-
-import InputPanel from "./components/InputPanel";
-import Graph from "./components/Graph";
-import IterationsTable from "./components/IterationsTable";
 
 ChartJS.register(
   LinearScale,
@@ -33,51 +33,63 @@ ChartJS.register(
 export const normalizarFuncion = (expr) => {
   let r = expr.trim();
 
-  // PASO 1: Multiplicación implícita PRIMERO
-  // (para que \b funcione en pasos siguientes)
-  r = r.replace(/(\d)([a-df-zA-DF-Z])/g, "$1*$2"); // 5x→5*x (excluye e/E)
-  r = r.replace(/(\d)(e)(?!\d)/gi, "$1*$2");         // 2e^x→2*e^x (no 1e5)
-  r = r.replace(/\)([a-zA-Z(])/g, ")*$1");           // )x→)*x
+  // Multiplicación implícita
+  r = r.replace(/(\d)([a-df-zA-DF-Z])/g, "$1*$2");
+  r = r.replace(/(\d)(e)(?!\d)/gi, "$1*$2");
+  r = r.replace(/\)([a-zA-Z(])/g, ")*$1");
 
-  // PASO 2: Nombres en español → mathjs (más largos primero)
+  // Traducciones
   const traducciones = [
     ["arcsen", "asin"],
     ["arccos", "acos"],
-    ["arctg",  "atan"],
-    ["senh",   "sinh"],
-    ["tgh",    "tanh"],
-    ["sen",    "sin"],
-    ["tg",     "tan"],
-    ["ctg",    "cot"],
-    ["ln",     "log"],
+    ["arctg", "atan"],
+    ["senh", "sinh"],
+    ["tgh", "tanh"],
+    ["sen", "sin"],
+    ["tg", "tan"],
+    ["ctg", "cot"],
+    ["ln", "log"],
   ];
+
   traducciones.forEach(([sp, en]) => {
     r = r.replace(new RegExp(`\\b${sp}`, "gi"), en);
   });
 
-  // PASO 3: Funciones sin paréntesis → agregar paréntesis (más largos primero)
+  // Funciones sin paréntesis
   const funciones = [
-    "asin","acos","atan","sinh","cosh","tanh",
-    "log10","sqrt","abs","exp","log",
-    "sin","cos","tan","cot",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "log10",
+    "sqrt",
+    "abs",
+    "exp",
+    "log",
+    "sin",
+    "cos",
+    "tan",
+    "cot",
   ];
+
   funciones.forEach((fn) => {
-    r = r.replace(new RegExp(`\\b${fn}(x)`,   "g"), `${fn}($1)`);
+    r = r.replace(new RegExp(`\\b${fn}(x)`, "g"), `${fn}($1)`);
     r = r.replace(new RegExp(`\\b${fn}(\\d)`, "g"), `${fn}($1)`);
   });
 
   return r;
 };
 
-// Compilación pura: sin setState (evita bucle infinito en render)
+// =========================
+// COMPILADOR
+// =========================
 const compilar = (raw) => {
   const normalizada = normalizarFuncion(raw);
 
   try {
-    // SIMPLIFICAR EXPRESIÓN
     const simplificada = simplify(normalizada).toString();
-
-    // COMPILAR
     const expr = compile(simplificada);
 
     return {
@@ -85,7 +97,6 @@ const compilar = (raw) => {
       normalizada: simplificada,
       error: null,
     };
-
   } catch (err) {
     return {
       expr: null,
@@ -106,6 +117,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState("");
   const [funcionNormalizada, setFuncionNormalizada] = useState("");
   const [metodoActual, setMetodoActual] = useState("");
+
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem("theme") || "dark";
@@ -120,18 +132,34 @@ export default function App() {
     } catch {}
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const toggleTheme = () => {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  };
 
   const evaluar = (expr, x) => expr.evaluate({ x });
 
   // =========================
-  // MÉTODO DE BISECCIÓN
+  // RESET
+  // =========================
+  const resetAll = () => {
+    setFuncion("");
+    setIteraciones([]);
+    setRaiz(null);
+    setErrorMsg("");
+    setFuncionNormalizada("");
+    setMetodoActual("");
+  };
+
+  // =========================
+  // BISECCIÓN
   // =========================
   const biseccion = () => {
     setErrorMsg("");
     setIteraciones([]);
+    setRaiz(null);
 
     const { expr, normalizada, error } = compilar(funcion);
+
     setFuncionNormalizada(normalizada);
 
     if (error) {
@@ -148,6 +176,7 @@ export default function App() {
     }
 
     let fa, fb;
+
     try {
       fa = Number(evaluar(expr, ai));
       fb = Number(evaluar(expr, bi));
@@ -157,46 +186,57 @@ export default function App() {
     }
 
     if (!Number.isFinite(fa) || !Number.isFinite(fb)) {
-      setErrorMsg("f(a) o f(b) no es numérica en el intervalo dado.");
+      setErrorMsg("f(a) o f(b) no es numérica.");
       return;
     }
 
     if (fa * fb > 0) {
-      setErrorMsg("f(a) y f(b) deben tener signos opuestos para garantizar una raíz en el intervalo.");
+      setErrorMsg(
+        "No se garantiza raíz en el intervalo porque f(a) y f(b) tienen el mismo signo."
+      );
       return;
     }
 
     setMetodoActual("biseccion");
 
-    let pasos = [];
-    let c = null;
-    let fc = null;
-    let error2 = Infinity;
-    let anterior = null;
-    let i = 1;
+    const pasos = [];
 
     const TOL = Number(tol) || 1e-8;
     const MAX_IT = 100;
 
-    while (error2 > TOL && i <= MAX_IT) {
+    let c = null;
+    let fc = null;
+    let anterior = null;
+    let errorVal = Infinity;
+
+    for (let i = 1; i <= MAX_IT; i++) {
       c = (ai + bi) / 2;
-      try {
-        fc = Number(evaluar(expr, c));
-      } catch (err) {
-        setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`);
-        return;
-      }
+
+      fc = Number(evaluar(expr, c));
 
       if (!Number.isFinite(fc)) {
-        setErrorMsg(`f(c) no es numérica en c=${c}`);
+        setErrorMsg("La función produjo valores inválidos.");
         return;
       }
 
-      if (anterior !== null) error2 = Math.abs(c - anterior);
+      if (anterior !== null) {
+        errorVal = Math.abs(c - anterior);
+      }
 
-      pasos.push({ iteracion: i, a: ai, b: bi, c, fc, error: error2 === Infinity ? 0 : error2 });
+      pasos.push({
+        iteracion: i,
+        a: ai,
+        b: bi,
+        c,
+        fc,
+        error: errorVal === Infinity ? 0 : errorVal,
+      });
 
-      if (Math.abs(fc) < TOL) break;
+      if (Math.abs(fc) < TOL || errorVal < TOL) {
+        setIteraciones(pasos);
+        setRaiz(c);
+        return;
+      }
 
       if (fa * fc < 0) {
         bi = c;
@@ -207,33 +247,21 @@ export default function App() {
       }
 
       anterior = c;
-      i++;
     }
 
-    setIteraciones(pasos);
-    setRaiz(c);
+    setErrorMsg("Bisección no convergió.");
   };
 
   // =========================
-  // RESET / REFRESH
-  // =========================
-  const resetAll = () => {
-    setFuncion("");
-    setIteraciones([]);
-    setRaiz(null);
-    setErrorMsg("");
-    setFuncionNormalizada("");
-    setMetodoActual("");
-  };
-
-  // =========================
-  // MÉTODO NEWTON-RAPHSON
+  // NEWTON-RAPHSON
   // =========================
   const newtonRaphson = () => {
     setErrorMsg("");
     setIteraciones([]);
+    setRaiz(null);
 
     const { expr, normalizada, error } = compilar(funcion);
+
     setFuncionNormalizada(normalizada);
 
     if (error) {
@@ -244,378 +272,349 @@ export default function App() {
     setMetodoActual("newton");
 
     try {
-      // DERIVADA SIMBÓLICA
       const derivadaExpr = derivative(normalizada, "x");
       const derivadaCompilada = derivadaExpr.compile();
 
       let x0 = Number(a);
+
       const TOL = Number(tol) || 1e-8;
+      const MAX_IT = 100;
+      const EPS = 1e-12;
 
       let pasos = [];
-      let errorVal = Infinity;
-      let i = 1;
-      const MAX_IT = 100;
-      const EPS_DERIV = 1e-12;
 
-      while (errorVal > TOL && i <= MAX_IT) {
-        let fx;
-        try { fx = Number(evaluar(expr, x0)); }
-        catch (err) { setErrorMsg(`Error al evaluar f en x=${x0}: ${err.message}`); return; }
+      for (let i = 1; i <= MAX_IT; i++) {
+        const fx = Number(evaluar(expr, x0));
+        const dfx = Number(derivadaCompilada.evaluate({ x: x0 }));
 
-        let dfxRaw;
-        try {
-          dfxRaw = derivadaCompilada.evaluate({ x: x0 });
-        } catch (err) {
-          setErrorMsg(`No se pudo evaluar la derivada en x=${x0}: ${err.message}`);
+        if (!Number.isFinite(fx) || !Number.isFinite(dfx)) {
+          setErrorMsg("La función o derivada devolvió valores inválidos.");
           return;
         }
 
-        let dfx = Number(dfxRaw);
-
-        // Si derivada muy pequeña o no numérica, intentar perturbar el punto inicial
-        if (!Number.isFinite(dfx) || Math.abs(dfx) < EPS_DERIV) {
-          let found = false;
-          const deltas = [1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 0.5, 1];
-
-          for (const delta of deltas) {
-            try {
-              const dposRaw = derivadaCompilada.evaluate({ x: x0 + delta });
-              const dpos = Number(dposRaw);
-              if (Number.isFinite(dpos) && Math.abs(dpos) >= EPS_DERIV) {
-                pasos.push({ iteracion: i, x0, fx, dfx: dpos, x1: x0 + delta, error: Math.abs(delta) });
-                x0 = x0 + delta;
-                dfx = dpos;
-                found = true;
-                i++;
-                break;
-              }
-
-              const dnegRaw = derivadaCompilada.evaluate({ x: x0 - delta });
-              const dneg = Number(dnegRaw);
-              if (Number.isFinite(dneg) && Math.abs(dneg) >= EPS_DERIV) {
-                pasos.push({ iteracion: i, x0, fx, dfx: dneg, x1: x0 - delta, error: Math.abs(delta) });
-                x0 = x0 - delta;
-                dfx = dneg;
-                found = true;
-                i++;
-                break;
-              }
-            } catch (e) {
-              // ignorar y seguir probando
-            }
-          }
-
-          if (!found) {
-            // Fallback: aproximar derivada con secante usando x0 y x0+delta
-            const delta = 1e-3;
-            const xPrev = x0 + delta;
-            let fxPrev;
-            try {
-              fxPrev = Number(evaluar(expr, xPrev));
-            } catch (err) {
-              setErrorMsg(`No se pudo evaluar f(x) para fallback secante: ${err.message}`);
-              return;
-            }
-
-            if (fxPrev === fx) {
-              setErrorMsg("La derivada es cero y no se pudo aplicar un método alternativo.");
-              return;
-            }
-
-            const approxD = (fx - fxPrev) / (x0 - xPrev);
-            const x1 = x0 - (fx * (x0 - xPrev)) / (fx - fxPrev);
-
-            errorVal = Math.abs(x1 - x0);
-            pasos.push({ iteracion: i, x0, fx, dfx: approxD, x1, error: errorVal });
-            x0 = x1;
-            i++;
-            continue;
-          }
+        if (Math.abs(dfx) < EPS) {
+          setErrorMsg("La derivada es cero o demasiado pequeña.");
+          return;
         }
 
-        // Paso Newton normal
         const x1 = x0 - fx / dfx;
-        errorVal = Math.abs(x1 - x0);
 
-        pasos.push({ iteracion: i, x0, fx, dfx, x1, error: errorVal });
+        // PROTECCIÓN CONTRA DIVERGENCIA
+        if (!Number.isFinite(x1) || Math.abs(x1) > 1e12) {
+          setErrorMsg(
+            "Newton-Raphson diverge. La función podría no tener raíces reales."
+          );
+          return;
+        }
 
-        if (Math.abs(fx) < TOL) {
-          x0 = x1;
-          break;
+        const errorVal = Math.abs(x1 - x0);
+
+        pasos.push({
+          iteracion: i,
+          x0,
+          fx,
+          dfx,
+          x1,
+          error: errorVal,
+        });
+
+        if (errorVal < TOL || Math.abs(fx) < TOL) {
+          const fxFinal = Number(evaluar(expr, x1));
+
+          // VALIDACIÓN REAL
+          if (
+            !Number.isFinite(fxFinal) ||
+            Math.abs(fxFinal) > Math.max(TOL * 10, 1e-6)
+          ) {
+            setErrorMsg(
+              "Newton-Raphson no convergió a una raíz real."
+            );
+            return;
+          }
+
+          setIteraciones(pasos);
+          setRaiz(x1);
+          return;
         }
 
         x0 = x1;
-        i++;
       }
 
-      setIteraciones(pasos);
-      setRaiz(x0);
+      setErrorMsg("Newton-Raphson no convergió.");
     } catch (err) {
       setErrorMsg(`Error: ${err.message}`);
     }
   };
 
   // =========================
-// MÉTODO DE LA SECANTE
-// =========================
-const secante = () => {
-  setErrorMsg("");
-  setIteraciones([]);
+  // SECANTE
+  // =========================
+  const secante = () => {
+    setErrorMsg("");
+    setIteraciones([]);
+    setRaiz(null);
 
-  const { expr, normalizada, error } = compilar(funcion);
-  setFuncionNormalizada(normalizada);
+    const { expr, normalizada, error } = compilar(funcion);
 
-  if (error) {
-    setErrorMsg(`Error de sintaxis: ${error}`);
-    return;
-  }
+    setFuncionNormalizada(normalizada);
 
-  setMetodoActual("secante");
-
-  let x0 = Number(a);
-  let x1 = Number(b);
-
-  const TOL = Number(tol) || 1e-8;
-  const MAX_IT = 100;
-
-  let pasos = [];
-  let errorVal = Infinity;
-  let i = 1;
-
-  while (errorVal > TOL && i <= MAX_IT) {
-    let fx0, fx1;
-
-    try {
-      fx0 = Number(evaluar(expr, x0));
-      fx1 = Number(evaluar(expr, x1));
-    } catch (err) {
-      setErrorMsg(`Error al evaluar la función: ${err.message}`);
+    if (error) {
+      setErrorMsg(`Error de sintaxis: ${error}`);
       return;
     }
 
-    if (!Number.isFinite(fx0) || !Number.isFinite(fx1)) {
-      setErrorMsg("La función devolvió valores no numéricos.");
+    setMetodoActual("secante");
+
+    let x0 = Number(a);
+    let x1 = Number(b);
+
+    const TOL = Number(tol) || 1e-8;
+    const MAX_IT = 100;
+
+    let pasos = [];
+
+    for (let i = 1; i <= MAX_IT; i++) {
+      const fx0 = Number(evaluar(expr, x0));
+      const fx1 = Number(evaluar(expr, x1));
+
+      if (!Number.isFinite(fx0) || !Number.isFinite(fx1)) {
+        setErrorMsg("La función produjo valores inválidos.");
+        return;
+      }
+
+      const denominador = fx1 - fx0;
+
+      if (Math.abs(denominador) < 1e-14) {
+        setErrorMsg("División por cero en secante.");
+        return;
+      }
+
+      const x2 = x1 - (fx1 * (x1 - x0)) / denominador;
+
+      if (!Number.isFinite(x2) || Math.abs(x2) > 1e12) {
+        setErrorMsg(
+          "El método de la secante diverge."
+        );
+        return;
+      }
+
+      const errorVal = Math.abs(x2 - x1);
+
+      pasos.push({
+        iteracion: i,
+        x0,
+        x1,
+        fx0,
+        fx1,
+        x2,
+        error: errorVal,
+      });
+
+      if (errorVal < TOL || Math.abs(fx1) < TOL) {
+        const fxFinal = Number(evaluar(expr, x2));
+
+        if (
+          !Number.isFinite(fxFinal) ||
+          Math.abs(fxFinal) > Math.max(TOL * 10, 1e-6)
+        ) {
+          setErrorMsg(
+            "La secante no convergió a una raíz real."
+          );
+          return;
+        }
+
+        setIteraciones(pasos);
+        setRaiz(x2);
+        return;
+      }
+
+      x0 = x1;
+      x1 = x2;
+    }
+
+    setErrorMsg("La secante no convergió.");
+  };
+
+  // =========================
+  // FALSA POSICIÓN
+  // =========================
+  const falsaPosicion = () => {
+    setErrorMsg("");
+    setIteraciones([]);
+    setRaiz(null);
+
+    const { expr, normalizada, error } = compilar(funcion);
+
+    setFuncionNormalizada(normalizada);
+
+    if (error) {
+      setErrorMsg(`Error de sintaxis: ${error}`);
       return;
     }
 
-    const denominador = fx1 - fx0;
+    setMetodoActual("falsaPosicion");
 
-    if (Math.abs(denominador) < 1e-14) {
-      setErrorMsg("División por cero en el método de la secante.");
+    let ai = Number(a);
+    let bi = Number(b);
+
+    let fa = Number(evaluar(expr, ai));
+    let fb = Number(evaluar(expr, bi));
+
+    if (fa * fb > 0) {
+      setErrorMsg(
+        "f(a) y f(b) deben tener signos opuestos."
+      );
       return;
     }
 
-    const x2 = x1 - (fx1 * (x1 - x0)) / denominador;
+    const pasos = [];
 
-    errorVal = Math.abs(x2 - x1);
+    const TOL = Number(tol) || 1e-8;
+    const MAX_IT = 100;
 
-    pasos.push({
-      iteracion: i,
-      x0,
-      x1,
-      fx0,
-      fx1,
-      x2,
-      error: errorVal,
-    });
+    let anterior = null;
 
-    if (Math.abs(fx1) < TOL) break;
+    for (let i = 1; i <= MAX_IT; i++) {
+      const c = bi - (fb * (bi - ai)) / (fb - fa);
 
-    x0 = x1;
-    x1 = x2;
+      const fc = Number(evaluar(expr, c));
 
-    i++;
-  }
+      if (!Number.isFinite(fc)) {
+        setErrorMsg("La función produjo valores inválidos.");
+        return;
+      }
 
-  setIteraciones(pasos);
-  setRaiz(x1);
-};
+      const errorVal =
+        anterior === null ? 0 : Math.abs(c - anterior);
 
-// =========================
-// MÉTODO DE FALSA POSICIÓN
-// =========================
-const falsaPosicion = () => {
-  setErrorMsg("");
-  setIteraciones([]);
+      pasos.push({
+        iteracion: i,
+        a: ai,
+        b: bi,
+        c,
+        fc,
+        error: errorVal,
+      });
 
-  const { expr, normalizada, error } = compilar(funcion);
-  setFuncionNormalizada(normalizada);
+      if (Math.abs(fc) < TOL || errorVal < TOL) {
+        setIteraciones(pasos);
+        setRaiz(c);
+        return;
+      }
 
-  if (error) {
-    setErrorMsg(`Error de sintaxis: ${error}`);
-    return;
-  }
+      if (fa * fc < 0) {
+        bi = c;
+        fb = fc;
+      } else {
+        ai = c;
+        fa = fc;
+      }
 
-  setMetodoActual("falsaPosicion");
-
-  let ai = Number(a);
-  let bi = Number(b);
-
-  const TOL = Number(tol) || 1e-8;
-  const MAX_IT = 100;
-
-  let fa, fb;
-
-  try {
-    fa = Number(evaluar(expr, ai));
-    fb = Number(evaluar(expr, bi));
-  } catch (err) {
-    setErrorMsg(`Error al evaluar la función: ${err.message}`);
-    return;
-  }
-
-  if (fa * fb > 0) {
-    setErrorMsg("f(a) y f(b) deben tener signos opuestos.");
-    return;
-  }
-
-  let pasos = [];
-  let c = null;
-  let errorVal = Infinity;
-  let anterior = null;
-  let i = 1;
-
-  while (errorVal > TOL && i <= MAX_IT) {
-    c = bi - (fb * (bi - ai)) / (fb - fa);
-
-    let fc;
-
-    try {
-      fc = Number(evaluar(expr, c));
-    } catch (err) {
-      setErrorMsg(`Error al evaluar en c=${c}: ${err.message}`);
-      return;
+      anterior = c;
     }
 
-    if (anterior !== null) {
-      errorVal = Math.abs(c - anterior);
-    }
-
-    pasos.push({
-      iteracion: i,
-      a: ai,
-      b: bi,
-      c,
-      fc,
-      error: errorVal === Infinity ? 0 : errorVal,
-    });
-
-    if (Math.abs(fc) < TOL) break;
-
-    if (fa * fc < 0) {
-      bi = c;
-      fb = fc;
-    } else {
-      ai = c;
-      fa = fc;
-    }
-
-    anterior = c;
-    i++;
-  }
-
-  setIteraciones(pasos);
-  setRaiz(c);
-};
+    setErrorMsg("Falsa posición no convergió.");
+  };
 
   // =========================
   // GRÁFICA
   // =========================
   const generarGrafica = () => {
-  const { expr, error } = compilar(funcion);
-  if (error) return null;
+    const { expr, error } = compilar(funcion);
 
-  const XMIN = -10;
-  const XMAX = 10;
+    if (error) return null;
 
-  // MÁS PRECISIÓN
-  const PASO = 0.02;
+    const XMIN = -10;
+    const XMAX = 10;
+    const PASO = 0.02;
+    const YCLAMP = 80;
 
-  const YCLAMP = 80;
+    const puntos = [];
 
-  const puntos = [];
+    for (let x = XMIN; x <= XMAX; x += PASO) {
+      try {
+        const y = evaluar(expr, x);
 
-  for (let x = XMIN; x <= XMAX; x += PASO) {
-    try {
-      const y = evaluar(expr, x);
+        puntos.push({
+          x,
+          y:
+            isFinite(y) && Math.abs(y) <= YCLAMP
+              ? y
+              : null,
+        });
+      } catch {
+        puntos.push({
+          x,
+          y: null,
+        });
+      }
+    }
 
-      puntos.push({
-        x,
-        y: isFinite(y) && Math.abs(y) <= YCLAMP ? y : null,
-      });
+    const datasets = [
+      {
+        label: "f(x)",
+        data: puntos,
+        parsing: false,
+        borderColor: "#60a5fa",
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0,
+        spanGaps: false,
+      },
+    ];
 
-    } catch {
-      puntos.push({
-        x,
-        y: null,
+    if (raiz !== null && isFinite(raiz)) {
+      datasets.push({
+        label: `Raíz ≈ ${raiz.toFixed(6)}`,
+        data: [{ x: raiz, y: 0 }],
+        parsing: false,
+        borderColor: "#f87171",
+        backgroundColor: "#f87171",
+        pointRadius: 8,
+        pointHoverRadius: 10,
+        pointStyle: "circle",
+        showLine: false,
       });
     }
-  }
 
-  const datasets = [
-    {
-      label: "f(x)",
-      data: puntos,
-      parsing: false,
-      borderColor: "#60a5fa",
-      backgroundColor: "transparent",
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0,
-      spanGaps: false,
-    },
-  ];
-
-  // MARCADOR DE RAÍZ EXACTO
-  if (raiz !== null && isFinite(raiz)) {
-    datasets.push({
-      label: `Raíz ≈ ${raiz.toFixed(6)}`,
-      data: [
-        {
-          x: raiz,
-          y: 0,
-        },
-      ],
-      parsing: false,
-      borderColor: "#f87171",
-      backgroundColor: "#f87171",
-      pointRadius: 8,
-      pointHoverRadius: 10,
-      pointStyle: "circle",
-      showLine: false,
-    });
-  }
-
-  return {
-    datasets,
+    return {
+      datasets,
+    };
   };
-};
 
   return (
     <div
       className={`min-h-screen flex flex-col p-8 ${
-        theme === "dark" ? "bg-slate-900 text-white" : "bg-white text-slate-900"
+        theme === "dark"
+          ? "bg-slate-900 text-white"
+          : "bg-white text-slate-900"
       }`}
     >
       <div className="flex-grow">
         <div className="flex items-center justify-between mb-6">
           <div className="text-center">
-            <h1 className="text-4xl font-bold">Calculadora de Raíces</h1>
-            <h3 className="text-2xl font-bold mt-2">(métodos numéricos)</h3>
+            <h1 className="text-4xl font-bold">
+              Calculadora de Raíces
+            </h1>
+
+            <h3 className="text-2xl font-bold mt-2">
+              (Métodos Numéricos)
+            </h3>
           </div>
 
-          <div>
-            <button
-              onClick={toggleTheme}
-              className={`px-4 py-2 rounded-md ${
-                theme === "dark"
-                  ? "bg-slate-700 text-white hover:bg-slate-600"
-                  : "bg-slate-100 text-slate-900 hover:bg-slate-200"
-              }`}
-            >
-              {theme === "dark" ? "🌙 Oscuro" : "☀️ Claro"}
-            </button>
-          </div>
+          <button
+            onClick={toggleTheme}
+            className={`px-4 py-2 rounded-md ${
+              theme === "dark"
+                ? "bg-slate-700 hover:bg-slate-600"
+                : "bg-slate-200 hover:bg-slate-300"
+            }`}
+          >
+            {theme === "dark"
+              ? "🌙 Oscuro"
+              : "☀️ Claro"}
+          </button>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -639,17 +638,35 @@ const falsaPosicion = () => {
             theme={theme}
           />
 
-          <Graph data={generarGrafica()} theme={theme} />
+          <Graph
+            data={generarGrafica()}
+            theme={theme}
+          />
         </div>
 
-        <div className={`mt-10 p-6 rounded-2xl shadow-lg overflow-auto ${theme === 'dark' ? 'bg-slate-800' : 'bg-white border border-slate-200'}`}>
-          <h2 className="text-2xl font-bold mb-4">Iteraciones</h2>
-          <IterationsTable iteraciones={iteraciones} metodoActual={metodoActual} theme={theme} />
-          <ConvergenceGraph iteraciones={iteraciones} theme={theme} />
+        <div
+          className={`mt-10 p-6 rounded-2xl shadow-lg overflow-auto ${
+            theme === "dark"
+              ? "bg-slate-800"
+              : "bg-slate-100"
+          }`}
+        >
+          <h2 className="text-2xl font-bold mb-4">
+            Iteraciones
+          </h2>
+
+          <IterationsTable
+            iteraciones={iteraciones}
+            metodoActual={metodoActual}
+            theme={theme}
+          />
+
+          <ConvergenceGraph
+            iteraciones={iteraciones}
+            theme={theme}
+          />
         </div>
       </div>
-
-    
     </div>
   );
 }
